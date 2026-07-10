@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한화이글스 팩트체크 스와이프 게임</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #1a1a24;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            color: white;
+        }
+        
+        /* 전체 컨테이너 */
+        .game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            height: 650px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #ff6600;
+            text-shadow: 0 0 10px rgba(255,102,0,0.5);
+        }
+
+        .progress {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        /* 카드덱 영역 */
+        .card-deck {
+            position: relative;
+            width: 100%;
+            height: 420px;
+            perspective: 1000px;
+        }
+
+        /* 개별 퀴즈 카드 */
+        .card {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: #2a2a36;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid #3a3a4a;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform-origin: center bottom;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .card:active {
+            cursor: grabbing;
+        }
+
+        /* 이미지 영역 */
+        .card-image {
+            width: 100%;
+            height: 50%;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-size: 0.85rem;
+            text-align: center;
+            border-bottom: 1px solid #3a3a4a;
+            position: relative;
+        }
+
+        .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 텍스트 영역 */
+        .card-content {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            line-height: 1.6;
+            text-align: center;
+            word-break: keep-all;
+        }
+
+        /* 스와이프 안내 뱃지 */
+        .swipe-badge {
+            position: absolute;
+            top: 20px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            opacity: 0;
+            transform: rotate(-15deg);
+            border: 4px solid dashed;
+        }
+        .badge-real {
+            left: 20px;
+            color: #28a745;
+            border-color: #28a745;
+            transform: rotate(-15deg);
+        }
+        .badge-fake {
+            right: 20px;
+            color: #dc3545;
+            border-color: #dc3545;
+            transform: rotate(15deg);
+        }
+
+        /* 하단 안내 및 컨트롤 */
+        .instruction {
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            gap: 20px;
+        }
+
+        .action-buttons button {
+            flex: 1;
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            color: white;
+        }
+
+        .btn-o { background-color: #28a745; box-shadow: 0 4px 15px rgba(40,167,69,0.4); }
+        .btn-x { background-color: #dc3545; box-shadow: 0 4px 15px rgba(220,53,69,0.4); }
+        .action-buttons button:active { transform: scale(0.95); }
+
+        /* 화면 전체 효과 오버레이 (정답/오답 큰 이펙트용) */
+        .effect-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.1s ease;
+            font-size: 8rem;
+            font-weight: bold;
+        }
+
+        /* 정답 대형 이펙트 */
+        .effect-correct {
+            background-color: rgba(40, 167, 69, 0.25);
+            color: #28a745;
+            text-shadow: 0 0 50px #28a745;
+        }
+
+        /* 오답 대형 이펙트 */
+        .effect-wrong {
+            background-color: rgba(220, 53, 69, 0.25);
+            color: #dc3545;
+            text-shadow: 0 0 50px #dc3545;
+        }
+
+        /* 애니메이션 효과 키프레임 */
+        @keyframes popEffect {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+
+        .trigger-animation {
+            animation: popEffect 0.6s ease-out forwards;
+        }
+
+        /* 해설 모달 창 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .modal-content {
+            background-color: #222;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            border: 2px solid #444;
+        }
+
+        .modal-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .modal-reason {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: #ddd;
+            margin-bottom: 25px;
+            word-break: keep-all;
+        }
+
+        .modal-btn {
+            background-color: #ff6600;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        /* 최종 스코어 보드 */
+        .score-board {
+            text-align: center;
+        }
+        .score-num {
+            font-size: 3.5rem;
+            color: #ff6600;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 대형 정답/오답 화면 이펙트용 레이어 -->
+<div id="effect-layer" class="effect-overlay"></div>
+
+<div class="game-wrapper" id="game-wrapper">
+    <div>
+        <h2>⚾ 한화이글스 스와이프 퀴즈</h2>
+        <div class="progress" id="progress-text">1 / 4</div>
+    </div>
+
+    <!-- 스와이프 카드 레이아웃 -->
+    <div class="card-deck" id="card-deck">
+        <div class="card" id="active-card">
+            <div class="swipe-badge badge-real" id="badge-o">진짜 (O)</div>
+            <div class="swipe-badge badge-fake" id="badge-x">가짜 (X)</div>
+            
+            <div class="card-image" id="card-img-area">이미지</div>
+            <div class="card-content" id="card-text-area">뉴스 헤드라인 내용</div>
+        </div>
+    </div>
+
+    <div>
+        <div class="instruction">👈 왼쪽으로 밀면 [진짜] | 오른쪽으로 밀면 [가짜] 👉<br>(하단 버튼을 터치해도 작동합니다)</div>
+        <div class="action-buttons">
+            <button class="btn-o" onclick="swipeAction('left')">진짜 (O)</button>
+            <button class="btn-x" onclick="swipeAction('right')">가짜 (X)</button>
+        </div>
+    </div>
+</div>
+
+<!-- 해설 팝업 모달 -->
+<div class="modal" id="explanation-modal">
+    <div class="modal-content">
+        <div class="modal-title" id="modal-title-text">정답입니다!</div>
+        <div class="modal-reason" id="modal-reason-text">해설 내용</div>
+        <button class="modal-btn" onclick="closeModal()">다음 문제 풀기 ➡️</button>
+    </div>
+</div>
+
+<script>
+    const quizData = [
+        {
+            "headline": "한화이글스 강백호, KBO 타점 1위로 팀을 3등까지 이끌어..",
+            "isFake": true,
+            "reason": "KBO 타점1위가 강백호 선수인 것은 맞지만, 현재 한화이글스는 6위입니다.",
+            "image": "강백호.jpg"
+        },
+        {
+            "headline": "한화이글스 노시환은 6경기 연속 홈런을 쳐낸적이 있다.",
+            "isFake": true,
+            "reason": "노시환의 개인 최고기록은 5경기 연속 홈런입니다.",
+            "image": "노시환.jpg"
+        },
+        {
+            "headline": "한화이글스 노시환은 2027년부터 11년, 총액 307억 원에 계약하며 KBO 역사상 최대규모의 계약을 맺었다.",
+            "isFake": false,
+            "reason": "정답입니다! KBO 역사상 최장기/최대 규모의 공식 계약이 성사되었습니다.",
+            "image": "노시바리.jpg"
+        },
+        {
+            "headline": "한화이글스 류현진은 2026년 07월 05월 22일, 역대 2번째 한미통산 200승을 거두었다.",
+            "isFake": true,
+            "reason": "오답 유도 지문입니다. 실제 한미통산 200승 달성일은 2026년 05월 24일이었습니다.",
+            "image": "maxresdefault.jpg"
+        }
+    ];
+
+    let currentIdx = 0;
+    let score = 0;
+    
+    // 마우스/터치 드래그 스크립트 변수
+    const card = document.getElementById('active-card');
+    const badgeO = document.getElementById('badge-o');
+    const badgeX = document.getElementById('badge-x');
+    
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+
+    function loadCard() {
+        if (currentIdx >= quizData.length) {
+            showFinalScore();
+            return;
+        }
+
+        // 진행도 업데이트
+        document.getElementById('progress-text').innerText = `${currentIdx + 1} / ${quizData.length}`;
+        
+        // 카드 텍스트 & 이미지 세팅
+        document.getElementById('card-text-area').innerText = quizData[currentIdx].headline;
+        
+        const imgName = quizData[currentIdx].image;
+        document.getElementById('card-img-area').innerHTML = `<img src="${imgName}" onerror="this.style.display='none'; this.parentNode.innerText='🖼️ 사진 미검출\n(${imgName})';" />`;
+        
+        // 카드 위치 초기화 및 불투명도 복구
+        card.style.transform = 'translateX(0px) rotate(0deg)';
+        card.style.opacity = '1';
+        badgeO.style.opacity = '0';
+        badgeX.style.opacity = '0';
+    }
+
+    // 마우스 및 터치 이벤트 리스너 설정 (스와이프 기능)
+    card.addEventListener('mousedown', (e) => startDrag(e.clientX));
+    card.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientX));
+
+    window.addEventListener('mousemove', (e) => doDrag(e.clientX));
+    window.addEventListener('touchmove', (e) => doDrag(e.touches[0].clientX));
+
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchend', endDrag);
+
+    function startDrag(clientX) {
+        isDragging = true;
+        startX = clientX;
+        card.style.transition = 'none'; // 드래그 중엔 부드러운 전환 효과 끄기
+    }
+
+    function doDrag(clientX) {
+        if (!isDragging) return;
+        currentX = clientX - startX;
+        let rot = currentX / 15; // 움직임에 따라 회전각도 생성
+        
+        card.style.transform = `translateX(${currentX}px) rotate(${rot}deg)`;
+
+        // 드래그 방향에 따라 O, X 뱃지 선명도 연출
+        if (currentX < 0) { // 왼쪽 드래그 (진짜)
+            badgeO.style.opacity = Math.min(-currentX / 100, 1);
+            badgeX.style.opacity = '0';
+        } else { // 오른쪽 드래그 (가짜)
+            badgeX.style.opacity = Math.min(currentX / 100, 1);
+            badgeO.style.opacity = '0';
+        }
+    }
+
+    function endDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        card.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+
+        if (currentX < -120) {
+            // 왼쪽 스와이프 확정 (유저 선택: 진짜 / false)
+            executeAnswer(false, 'left');
+        } else if (currentX > 120) {
+            // 오른쪽 스와이프 확정 (유저 선택: 가짜 / true)
+            executeAnswer(true, 'right');
+        } else {
+            // 원위치 복귀
+            card.style.transform = 'translateX(0px) rotate(0deg)';
+            badgeO.style.opacity = '0';
+            badgeX.style.opacity = '0';
+        }
+    }
+
+    // 하단 버튼 클릭 시 스와이프 동작 연출
+    function swipeAction(direction) {
+        card.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+        if (direction === 'left') {
+            card.style.transform = 'translateX(-400px) rotate(-30deg)';
+            card.style.opacity = '0';
+            setTimeout(() => executeAnswer(false, 'left'), 200);
+        } else {
+            card.style.transform = 'translateX(400px) rotate(30deg)';
+            card.style.opacity = '0';
+            setTimeout(() => executeAnswer(true, 'right'), 200);
+        }
+    }
+
+    // 정답 판정 및 초대형 이펙트 연출
+    function executeAnswer(userChoice, direction) {
+        const currentQuiz = quizData[currentIdx];
+        const isCorrect = (userChoice === currentQuiz.isFake);
+        
+        const effectLayer = document.getElementById('effect-layer');
+        
+        if (isCorrect) {
+            score++;
+            effectLayer.className = "effect-overlay effect-correct trigger-animation";
+            effectLayer.innerText = "⭕ 정답";
+            document.getElementById('modal-title-text').innerHTML = "🎉 정답입니다!";
+            document.getElementById('modal-title-text').style.color = "#28a745";
+        } else {
+            effectLayer.className = "effect-overlay effect-wrong trigger-animation";
+            effectLayer.innerText = "❌ 오답";
+            document.getElementById('modal-title-text').innerHTML = "😭 틀렸습니다!";
+            document.getElementById('modal-title-text').style.color = "#dc3545";
+        }
+
+        document.getElementById('modal-reason-text').innerText = currentQuiz.reason;
+
+        // 이펙트 애니메이션이 진행된 후 해설 팝업 띄우기
+        setTimeout(() => {
+            effectLayer.className = "effect-overlay"; // 이펙트 초기화
+            document.getElementById('explanation-modal').style.display = 'flex';
+        }, 700);
+    }
+
+    function closeModal() {
+        document.getElementById('explanation-modal').style.display = 'none';
+        currentIdx++;
+        loadCard();
+    }
+
+    // 최종 결과 화면 표시
+    function showFinalScore() {
+        const wrapper = document.getElementById('game-wrapper');
+        wrapper.innerHTML = `
+            <div class="score-board">
+                <h2>⚾ 경기 종료!</h2>
+                <div class="score-num">${score} / ${quizData.length}</div>
+                <p style="font-size:1.1rem; line-height:1.5; color:#ccc;">
+                    ${score === quizData.length ? '👑 대단합니다! 팩트체크 마스터 수준이시네요!' : '수고하셨습니다! 다시 도전해보세요.'}
+                </p>
+                <button class="modal-btn" style="margin-top:20px;" onclick="location.reload()">다시 시작하기 🔄</button>
+            </div>
+        `;
+    }
+
+    // 게임 시작 시 첫 카드 장전
+    loadCard();
+</script>
+
+</body>
+</html>
